@@ -13,6 +13,15 @@
       forAllSystems = f: nixpkgs.lib.genAttrs systems (system: f nixpkgs.legacyPackages.${system});
     in
     {
+      packages = forAllSystems (pkgs: rec {
+        matrixclear = pkgs.callPackage ./package.nix { };
+        default = matrixclear;
+      });
+
+      overlays.default = final: _prev: {
+        matrixclear = final.callPackage ./package.nix { };
+      };
+
       # mkShell already brings stdenv's C compiler; make is listed explicitly
       # because it is not guaranteed to be on PATH outside a build.
       devShells = forAllSystems (pkgs: {

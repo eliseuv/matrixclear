@@ -20,6 +20,20 @@ alias clear=/path/to/cneoclear/target/release/matrixclear
 Sources are in `src/`; [`config.h`](config.h) stays at the root because it is
 the file you edit.
 
+## Install with Nix
+
+```sh
+nix run github:<owner>/matrixclear      # try it
+```
+
+As a flake input, use either `inputs.matrixclear.packages.${system}.default`
+or `inputs.matrixclear.overlays.default` (adds `pkgs.matrixclear`). Since
+options are compile-time, set them with `override`:
+
+```nix
+pkgs.matrixclear.override { defines = [ "DIR_LEFT=1" "COLOR=0xff2d2d" ]; }
+```
+
 ## Configure
 
 Edit `config.h`, or override values per build:
