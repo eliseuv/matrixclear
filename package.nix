@@ -19,6 +19,10 @@ stdenv.mkDerivation {
     ];
   };
 
+  # Structured attrs keep makeFlags a real list: otherwise the single
+  # CPPFLAGS=... string is word-split and make sees each -D as an option.
+  __structuredAttrs = true;
+
   makeFlags = lib.optional (defines != [ ]) "CPPFLAGS=${lib.concatMapStringsSep " " (d: "-D${d}") defines}";
 
   installPhase = ''
