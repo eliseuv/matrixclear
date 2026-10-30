@@ -311,20 +311,22 @@ bool anim_render(struct anim *a, float t, struct buf *out) {
     bool all_arrived = true;
     for (size_t i = 0; i < a->nlanes; i++) {
         a->heads[i] = (t - a->lanes[i].delay) * a->lanes[i].speed;
-        if (a->heads[i] < (float)a->lanes[i].len) all_arrived = false;
+        /* The lane is full when its head reaches its last cell. */
+        if (a->lanes[i].len && a->heads[i] < (float)(a->lanes[i].len - 1)) all_arrived = false;
     }
     if (all_arrived && !a->done) {
         a->done = true;
         a->t_done = t;
     }
     float exit_elapsed = 0.0f;
+    bool finished = false;
     if (a->done) {
         if (a->exit_s <= 0.0f) {
             /* Still draw the frame in which the last streams arrive. */
-            if (t > a->t_done) return true;
+            finished = t > a->t_done;
         } else {
             exit_elapsed = t - a->t_done;
-            if (exit_elapsed >= a->exit_s) return true;
+            finished = exit_elapsed >= a->exit_s;
         }
     }
 
@@ -333,7 +335,12 @@ bool anim_render(struct anim *a, float t, struct buf *out) {
     for (size_t idx = 0; idx < a->ncells; idx++) {
         uint32_t lane = a->cell_lane[idx];
         if (lane == NONE) continue;
-        size_t exit_cells = a->done ? (size_t)(exit_elapsed * a->lanes[lane].speed * a->exit_scale) : 0;
+        size_t exit_cells = 0;
+        if (finished) exit_cells = a->lanes[lane].len;
+        else if (a->done) exit_cells = (size_t)(exit_elapsed * a->lanes[lane].speed * a->exit_scale);
+        /* The arrival frame stays full; the next frame starts the exit even
+         * when less than one cell of travel fits in that frame interval. */
+        if (exit_elapsed > 0.0f && exit_cells == 0) exit_cells = 1;
         if ((size_t)a->cell_pos[idx] < exit_cells) {
             if (a->drawn_ch[idx] != ' ') {
                 if (cursor != (ptrdiff_t)idx) {
@@ -401,5 +408,9 @@ bool anim_render(struct anim *a, float t, struct buf *out) {
         /* after printing, the cursor advances unless we're in the last column */
         cursor = (idx + 1) % a->w != 0 ? (ptrdiff_t)(idx + 1) : -1;
     }
-    return false;
+    return finished;
+}
+
+bool anim_exiting(const struct anim *a, float t) {
+    return a->done && t > a->t_done;
 }

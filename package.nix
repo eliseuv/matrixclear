@@ -16,6 +16,7 @@ stdenv.mkDerivation {
       ./Makefile
       ./config.h
       ./src
+      ./shell
     ];
   };
 
@@ -28,6 +29,7 @@ stdenv.mkDerivation {
   installPhase = ''
     runHook preInstall
     install -Dm755 target/release/matrixclear $out/bin/matrixclear
+    install -Dm644 shell/matrixclear.zsh $out/share/matrixclear/matrixclear.zsh
     runHook postInstall
   '';
 

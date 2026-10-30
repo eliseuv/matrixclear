@@ -5,6 +5,10 @@ replacement that pours streams of Matrix-style glyphs in from the screen
 edges. They meet in the middle, run off the screen, and leave a blank terminal,
 scrollback included.
 
+The screen is fully covered for one frame before the streams start leaving.
+The departing streams erase the screen as they go; a completed animation does
+not perform another full-screen clear.
+
 The default glyphs mix halfwidth Katakana, digits and Latin letters. Halfwidth
 characters fit the terminal's single-cell streams. Set `MATRIX_GLYPHS=0` to
 restore the configurable code-point range (Braille by default).
@@ -18,11 +22,22 @@ dependencies beyond libc and libm; Linux only.
 ```sh
 nix develop          # gcc + make (or direnv: `direnv allow` once)
 make                 # builds target/release/matrixclear
-alias clear=/path/to/cneoclear/target/release/matrixclear
+MATRIXCLEAR_BIN="$PWD/target/release/matrixclear"
+source "$PWD/shell/matrixclear.zsh"  # in zsh; add absolute paths to ~/.zshrc
 ```
 
 Sources are in `src/`; [`config.h`](config.h) stays at the root because it is
 the file you edit.
+
+The zsh function replaces an existing `clear` alias and passes the expanded
+left prompt to the renderer. Its Ctrl-L widget also preserves the command being
+edited. This lets the prompt appear while the glyphs leave, before zsh redraws
+it normally. Run the binary directly for the plain animation without prompt
+preview.
+
+If tmux uses `vim-tmux-navigator`, its default Ctrl+L binding intercepts the
+key before zsh receives it. Set `@vim_navigator_mapping_right` to `C-Right`
+before loading that plugin so the Ctrl+L widget works inside tmux panes.
 
 ## Install with Nix
 
@@ -50,8 +65,8 @@ make clean && make CPPFLAGS='-DDIR_LEFT=1 -DDIR_RIGHT=1 -DCOLOR=0xff2d2d'
 | --------------------------------------------- | ------------------- | --------------------------------------------------------- |
 | `DIR_TOP` `DIR_BOTTOM` `DIR_LEFT` `DIR_RIGHT` | `1 0 0 0`           | edges the streams start from                              |
 | `RANDOM_DIRECTIONS`                           | `0`                 | pick a random combination of edges every run              |
-| `DURATION_MS`                                 | `900`               | time until every stream reaches the meeting line          |
-| `EXIT_MS`                                     | `350`               | time for streams to run out after they arrive             |
+| `DURATION_MS`                                 | `500`               | time until every stream reaches the meeting line          |
+| `EXIT_MS`                                     | `500`               | time for streams to run out after they arrive             |
 | `FPS`                                         | `60`                | frames per second                                         |
 | `COLOR`                                       | `0x1cff5a`          | stream colour                                             |
 | `HEAD_COLOR_AUTO` / `HEAD_COLOR`              | `1` / `0xffffff`    | leading glyph: whitened tint of `COLOR`, or this colour   |

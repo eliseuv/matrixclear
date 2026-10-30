@@ -95,14 +95,17 @@ int main(void) {
      * it started; drawing jumps around invisibly in between. (Saving per
      * frame also works on terminals that treat DECSC/DECRC as a one-shot
      * stack.) This keeps cursor shaders/trails (Ghostty etc.) still until the
-     * single move to the top-left in the final clear. */
+     * single move to the top-left when the animation finishes. */
     static const char setup[] = "\x1b[?25l\x1b[?7l\x1b[0m";
     write_all(STDOUT_FILENO, setup, sizeof setup - 1);
+    if (CLEAR_SCROLLBACK) write_all(STDOUT_FILENO, "\x1b[3J", 4);
 
     struct timespec start;
     clock_gettime(CLOCK_MONOTONIC, &start);
     struct buf b;
     buf_init(&b, w * h * 24);
+    const char *final_prompt = getenv("MATRIXCLEAR_FINAL_PROMPT");
+    bool completed = false;
     for (uint64_t frame = 1;; frame++) {
         size_t cw, ch;
         if (term_interrupted() || !term_size(&cw, &ch) || cw != w || ch != h)
@@ -112,11 +115,21 @@ int main(void) {
         buf_append_str(&b, "\x1b[?2026h\x1b" "7"); /* begin synchronized update, save cursor */
         size_t empty = b.len;
         bool finished = anim_render(anim, t, &b);
+        if (final_prompt && *final_prompt && anim_exiting(anim, t)) {
+            /* A shell wrapper can supply the next prompt. Redraw it over the
+             * departing code so the prompt is already visible at completion. */
+            buf_append_str(&b, "\x1b[?7h\x1b[H");
+            buf_append_str(&b, final_prompt);
+            buf_append_str(&b, "\x1b[?7l");
+        }
         if (b.len > empty) {
             buf_append_str(&b, "\x1b" "8\x1b[?2026l"); /* cursor back to where it started, then present */
             if (!write_all(STDOUT_FILENO, b.data, b.len)) break;
         }
-        if (finished) break;
+        if (finished) {
+            completed = true;
+            break;
+        }
         /* Absolute deadlines don't drift; EINTR (Ctrl-C) ends the sleep early
          * and the loop re-checks the flag. */
         struct timespec next = add_ns(&start, frame * 1000000000u / FPS);
@@ -124,10 +137,12 @@ int main(void) {
         }
     }
 
-    /* the one and only visible cursor move: clear, home, show cursor */
+    /* A completed exit has already erased the screen cell by cell. An
+     * interrupted exit still needs a full clear. */
     b.len = 0;
     buf_append_str(&b, "\x1b[?2026h");
-    append_final_clear(&b);
+    if (completed) buf_append_str(&b, "\x1b[0m\x1b[H");
+    else append_final_clear(&b);
     buf_append_str(&b, "\x1b[?7h\x1b[?25h\x1b[?2026l");
     write_all(STDOUT_FILENO, b.data, b.len);
 
