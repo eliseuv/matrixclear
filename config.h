@@ -76,7 +76,12 @@
 #define GLITCH 0.02f
 #endif
 
-/* Inclusive code-point range glyphs are drawn from. */
+/* Matrix-style halfwidth Katakana, digits and Latin letters by default.
+ * Set to 0 to draw from CHARS_LO..CHARS_HI instead. */
+#ifndef MATRIX_GLYPHS
+#define MATRIX_GLYPHS 1
+#endif
+/* Inclusive code-point range used when MATRIX_GLYPHS is 0. */
 #ifndef CHARS_LO
 #define CHARS_LO 0x2800
 #endif
@@ -109,6 +114,7 @@ _Static_assert(CFG_MILLI(SPEED_SPREAD) >= 1000 && CFG_MILLI(SPEED_SPREAD) <= 200
 _Static_assert(CFG_MILLI(SPEED) >= 0, "SPEED must be >= 0 (0 = use DURATION_MS)");
 _Static_assert(CFG_MILLI(STAGGER) >= 0 && CFG_MILLI(STAGGER) <= 1000, "STAGGER must be between 0 and 1");
 _Static_assert(CFG_MILLI(GLITCH) >= 0 && CFG_MILLI(GLITCH) <= 1000, "GLITCH must be between 0 and 1");
+_Static_assert(MATRIX_GLYPHS == 0 || MATRIX_GLYPHS == 1, "MATRIX_GLYPHS must be 0 or 1");
 _Static_assert(CHARS_LO <= CHARS_HI && CHARS_HI <= 0x10FFFF, "unusable CHARS range");
 _Static_assert(!(CHARS_LO >= 0xD800 && CHARS_HI <= 0xDFFF), "CHARS range contains only surrogates");
 _Static_assert(COLOR_MODE == COLOR_MODE_AUTO || COLOR_MODE == COLOR_MODE_TRUECOLOR || COLOR_MODE == COLOR_MODE_ANSI256,

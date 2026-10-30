@@ -96,6 +96,15 @@ static bool valid_scalar(uint32_t c) {
 }
 
 static uint32_t random_glyph(struct rng *r) {
+    if (MATRIX_GLYPHS) {
+        /* The film's code mixes Japanese characters with Roman letters and
+         * numerals. Halfwidth Katakana keep every glyph in one terminal cell;
+         * fullwidth Katakana would break cursor positioning and stream lanes. */
+        uint32_t pick = rng_range(r, 0, 99);
+        if (pick < 65) return rng_range(r, 0xFF66, 0xFF9D);
+        if (pick < 85) return rng_range(r, '0', '9');
+        return rng_range(r, 'A', 'Z');
+    }
     for (int i = 0; i < 8; i++) {
         uint32_t c = rng_range(r, CHARS_LO, CHARS_HI);
         if (valid_scalar(c)) return c;

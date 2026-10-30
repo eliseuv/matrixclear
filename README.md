@@ -1,9 +1,13 @@
 # matrixclear
 
 A C11 port of [neoclear](https://codeberg.org/ftranschel/neoclear/), a `clear`
-replacement that pours streams of braille glyphs (U+2800–U+28FF) in from the
+replacement that pours streams of Matrix-style glyphs in from the
 screen edges. They meet in the middle, fade out, and leave a blank terminal,
 scrollback included.
+
+The default glyphs mix halfwidth Katakana, digits and Latin letters. Halfwidth
+characters fit the terminal's single-cell streams. Set `MATRIX_GLYPHS=0` to
+restore the configurable code-point range (Braille by default).
 
 Unlike the Rust original there is no config file and no command-line arguments.
 Every option is a compile-time constant in [`config.h`](config.h). No
@@ -56,7 +60,8 @@ make clean && make CPPFLAGS='-DDIR_LEFT=1 -DDIR_RIGHT=1 -DCOLOR=0xff2d2d'
 | `SPEED`                                       | `0.0f`              | rows/s of the slowest streams; 0 = fit into `DURATION_MS` |
 | `STAGGER`                                     | `0.9f`              | how long fast streams may wait to start                   |
 | `GLITCH`                                      | `0.02f`             | per-frame flicker chance of a settled glyph               |
-| `CHARS_LO` / `CHARS_HI`                       | `0x2800` / `0x28FF` | code-point range                                          |
+| `MATRIX_GLYPHS`                               | `1`                 | Matrix-style glyph mix; `0` uses the code-point range     |
+| `CHARS_LO` / `CHARS_HI`                       | `0x2800` / `0x28FF` | range used when `MATRIX_GLYPHS=0`                         |
 | `COLOR_MODE`                                  | `COLOR_MODE_AUTO`   | or `COLOR_MODE_TRUECOLOR`, `COLOR_MODE_ANSI256`           |
 | `CLEAR_SCROLLBACK`                            | `1`                 | also erase scrollback, like `clear`                       |
 
