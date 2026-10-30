@@ -1,8 +1,8 @@
 # matrixclear
 
 A C11 port of [neoclear](https://codeberg.org/ftranschel/neoclear/), a `clear`
-replacement that pours streams of Matrix-style glyphs in from the
-screen edges. They meet in the middle, fade out, and leave a blank terminal,
+replacement that pours streams of Matrix-style glyphs in from the screen
+edges. They meet in the middle, run off the screen, and leave a blank terminal,
 scrollback included.
 
 The default glyphs mix halfwidth Katakana, digits and Latin letters. Halfwidth
@@ -51,7 +51,7 @@ make clean && make CPPFLAGS='-DDIR_LEFT=1 -DDIR_RIGHT=1 -DCOLOR=0xff2d2d'
 | `DIR_TOP` `DIR_BOTTOM` `DIR_LEFT` `DIR_RIGHT` | `1 0 0 0`           | edges the streams start from                              |
 | `RANDOM_DIRECTIONS`                           | `0`                 | pick a random combination of edges every run              |
 | `DURATION_MS`                                 | `900`               | time until every stream reaches the meeting line          |
-| `FADE_MS` / `FADE_STEPS`                      | `350` / `10`        | fade-out length and brightness steps                      |
+| `EXIT_MS`                                     | `350`               | time for streams to run out after they arrive             |
 | `FPS`                                         | `60`                | frames per second                                         |
 | `COLOR`                                       | `0x1cff5a`          | stream colour                                             |
 | `HEAD_COLOR_AUTO` / `HEAD_COLOR`              | `1` / `0xffffff`    | leading glyph: whitened tint of `COLOR`, or this colour   |

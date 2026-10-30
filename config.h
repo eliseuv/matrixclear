@@ -25,15 +25,11 @@
 
 /* Time (ms) until every stream has reached the meeting line. */
 #ifndef DURATION_MS
-#define DURATION_MS 900
+#define DURATION_MS 500
 #endif
-/* Length (ms) of the fade-out once all streams have arrived. */
-#ifndef FADE_MS
-#define FADE_MS 350
-#endif
-/* Number of discrete brightness steps in the fade. */
-#ifndef FADE_STEPS
-#define FADE_STEPS 10
+/* Time (ms) for the streams' tails to leave after all heads arrive. */
+#ifndef EXIT_MS
+#define EXIT_MS 500
 #endif
 #ifndef FPS
 #define FPS 60
@@ -104,8 +100,7 @@
 #pragma GCC diagnostic ignored "-Wgnu-folding-constant"
 #endif
 _Static_assert(RANDOM_DIRECTIONS || DIR_TOP || DIR_BOTTOM || DIR_LEFT || DIR_RIGHT, "no direction enabled");
-_Static_assert(DURATION_MS >= 0 && FADE_MS >= 0, "DURATION_MS and FADE_MS must be >= 0");
-_Static_assert(FADE_STEPS >= 1, "FADE_STEPS must be >= 1");
+_Static_assert(DURATION_MS >= 0 && EXIT_MS >= 0, "DURATION_MS and EXIT_MS must be >= 0");
 _Static_assert(FPS >= 1 && FPS <= 1000, "FPS must be between 1 and 1000");
 _Static_assert(COLOR >= 0 && COLOR <= 0xffffff && HEAD_COLOR >= 0 && HEAD_COLOR <= 0xffffff, "colours are 0xRRGGBB");
 _Static_assert(CFG_MILLI(TRAIL) >= 1000, "TRAIL must be >= 1");

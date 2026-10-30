@@ -3,7 +3,7 @@
  * screen, two opposite edges meet on the centre line, and all four meet in an
  * X. Each column (or row) gets one stream with its own speed and start delay;
  * all streams are timed to arrive within DURATION_MS. Once every stream has
- * arrived the whole field fades to black. */
+ * arrived their tails follow, clearing each lane as the code moves onward. */
 
 #include "anim.h"
 
@@ -69,6 +69,7 @@ struct lane {
     float speed; /* cells per second */
     uint32_t len; /* cells this stream must cover to reach the meeting line */
     float trail; /* bright-trail length in cells (longer for faster streams) */
+    ptrdiff_t step; /* row-major index change for one cell along the stream */
 };
 
 struct anim {
@@ -86,7 +87,8 @@ struct anim {
     struct rng rng;
     float color[3];
     float head[3];
-    float fade_s;
+    float exit_s;
+    float exit_scale;
     bool done;
     float t_done;
 };
@@ -239,7 +241,9 @@ struct anim *anim_new(size_t w, size_t h, bool truecolor) {
                 a->cell_pos[y * w + x] = (uint16_t)p;
                 len++;
             }
-            a->lanes[a->nlanes] = (struct lane){0.0f, 1.0f, len, TRAIL};
+            ptrdiff_t step = dir_vertical(d) ? (ptrdiff_t)w : 1;
+            if (d == DIR_B || d == DIR_R) step = -step;
+            a->lanes[a->nlanes] = (struct lane){0.0f, 1.0f, len, TRAIL, step};
             lane_dir[a->nlanes] = d;
             a->nlanes++;
         }
@@ -293,7 +297,13 @@ struct anim *anim_new(size_t w, size_t h, bool truecolor) {
         a->head[c] = HEAD_COLOR_AUTO ? roundf((float)base + (255.0f - (float)base) * 0.8f)
                                      : (float)unpack(HEAD_COLOR, shift);
     }
-    a->fade_s = (float)FADE_MS / 1000.0f;
+    a->exit_s = (float)EXIT_MS / 1000.0f;
+    float longest_exit = 0.0f;
+    for (size_t i = 0; i < a->nlanes; i++) {
+        float travel = (float)a->lanes[i].len / a->lanes[i].speed;
+        if (travel > longest_exit) longest_exit = travel;
+    }
+    a->exit_scale = a->exit_s > 0.0f ? longest_exit / a->exit_s : 0.0f;
     return a;
 }
 
@@ -307,19 +317,14 @@ bool anim_render(struct anim *a, float t, struct buf *out) {
         a->done = true;
         a->t_done = t;
     }
-    float fade = 1.0f;
+    float exit_elapsed = 0.0f;
     if (a->done) {
-        if (a->fade_s <= 0.0f) {
-            /* No fade: still draw the frame in which the last streams arrive
-             * (at full brightness), then finish on the next one. */
+        if (a->exit_s <= 0.0f) {
+            /* Still draw the frame in which the last streams arrive. */
             if (t > a->t_done) return true;
         } else {
-            float p = (t - a->t_done) / a->fade_s;
-            if (p >= 1.0f) return true;
-            /* stepped, slightly eased-in decrease of brightness */
-            float steps = (float)FADE_STEPS;
-            float step = floorf(p * steps) + 1.0f;
-            fade = powf(1.0f - step / (steps + 1.0f), 1.3f);
+            exit_elapsed = t - a->t_done;
+            if (exit_elapsed >= a->exit_s) return true;
         }
     }
 
@@ -328,12 +333,32 @@ bool anim_render(struct anim *a, float t, struct buf *out) {
     for (size_t idx = 0; idx < a->ncells; idx++) {
         uint32_t lane = a->cell_lane[idx];
         if (lane == NONE) continue;
+        size_t exit_cells = a->done ? (size_t)(exit_elapsed * a->lanes[lane].speed * a->exit_scale) : 0;
+        if ((size_t)a->cell_pos[idx] < exit_cells) {
+            if (a->drawn_ch[idx] != ' ') {
+                if (cursor != (ptrdiff_t)idx) {
+                    buf_append_str(out, "\x1b[");
+                    buf_append_uint(out, idx / a->w + 1);
+                    buf_append_str(out, ";");
+                    buf_append_uint(out, idx % a->w + 1);
+                    buf_append_str(out, "H");
+                }
+                buf_append_str(out, "\x1b[0m ");
+                a->drawn_ch[idx] = ' ';
+                a->drawn_key[idx] = NONE;
+                last_key = NONE;
+                cursor = (idx + 1) % a->w != 0 ? (ptrdiff_t)(idx + 1) : -1;
+            }
+            continue;
+        }
         float head = a->heads[lane];
         float trail = a->lanes[lane].trail;
         float k = head - (float)a->cell_pos[idx]; /* cells behind the head */
         if (k < 0.0f) continue; /* not reached yet: the old screen content stays visible */
-        float flicker = k < 1.0f ? 0.5f : GLITCH;
-        if (rng_f32(&a->rng) < flicker) a->glyph[idx] = random_glyph(&a->rng);
+        if (!a->done) {
+            float flicker = k < 1.0f ? 0.5f : GLITCH;
+            if (rng_f32(&a->rng) < flicker) a->glyph[idx] = random_glyph(&a->rng);
+        }
 
         float level = REST + (1.0f - REST) * fmaxf(1.0f - k / trail, 0.0f);
         float white = fminf(fmaxf(1.0f - k / 1.5f, 0.0f), 1.0f);
@@ -342,10 +367,11 @@ bool anim_render(struct anim *a, float t, struct buf *out) {
         for (int c = 0; c < 3; c++) {
             float v = (a->color[c] * s) * (1.0f - white) + a->head[c] * white;
             /* clamp before converting: out-of-range float->int is UB in C */
-            rgb[c] = (uint8_t)fminf(fmaxf(roundf(v * fade), 0.0f), 255.0f);
+            rgb[c] = (uint8_t)fminf(fmaxf(roundf(v), 0.0f), 255.0f);
         }
         uint32_t key = a->truecolor ? (uint32_t)rgb[0] << 16 | (uint32_t)rgb[1] << 8 | rgb[2] : to_ansi256(rgb);
-        uint32_t ch = a->glyph[idx];
+        size_t source = (size_t)((ptrdiff_t)idx - (ptrdiff_t)exit_cells * a->lanes[lane].step);
+        uint32_t ch = a->glyph[source];
         if (key == a->drawn_key[idx] && ch == a->drawn_ch[idx]) continue;
         if (cursor != (ptrdiff_t)idx) {
             buf_append_str(out, "\x1b[");
