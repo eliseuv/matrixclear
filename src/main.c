@@ -100,6 +100,11 @@ int main(void) {
     write_all(STDOUT_FILENO, setup, sizeof setup - 1);
     if (CLEAR_SCROLLBACK) write_all(STDOUT_FILENO, "\x1b[3J", 4);
 
+    /* tmux re-emits a synchronized update as one burst. A full-screen frame
+     * overruns its output limit, so tmux discards it and freezes the pane for
+     * 100ms. Unsynchronized, tmux forwards each frame as it reads it. */
+    bool sync_output = getenv("TMUX") == NULL;
+
     struct timespec start;
     clock_gettime(CLOCK_MONOTONIC, &start);
     struct buf b;
@@ -112,7 +117,8 @@ int main(void) {
             break; /* Ctrl-C or resize: skip straight to the clear */
         float t = (float)elapsed_s(&start);
         b.len = 0;
-        buf_append_str(&b, "\x1b[?2026h\x1b" "7"); /* begin synchronized update, save cursor */
+        if (sync_output) buf_append_str(&b, "\x1b[?2026h"); /* begin synchronized update */
+        buf_append_str(&b, "\x1b" "7"); /* save cursor */
         size_t empty = b.len;
         bool finished = anim_render(anim, t, &b);
         if (final_prompt && *final_prompt && anim_exiting(anim, t)) {
@@ -123,7 +129,8 @@ int main(void) {
             buf_append_str(&b, "\x1b[?7l");
         }
         if (b.len > empty) {
-            buf_append_str(&b, "\x1b" "8\x1b[?2026l"); /* cursor back to where it started, then present */
+            buf_append_str(&b, "\x1b" "8"); /* cursor back to where it started */
+            if (sync_output) buf_append_str(&b, "\x1b[?2026l"); /* present */
             if (!write_all(STDOUT_FILENO, b.data, b.len)) break;
         }
         if (finished) {
@@ -140,10 +147,11 @@ int main(void) {
     /* A completed exit has already erased the screen cell by cell. An
      * interrupted exit still needs a full clear. */
     b.len = 0;
-    buf_append_str(&b, "\x1b[?2026h");
+    if (sync_output) buf_append_str(&b, "\x1b[?2026h");
     if (completed) buf_append_str(&b, "\x1b[0m\x1b[H");
     else append_final_clear(&b);
-    buf_append_str(&b, "\x1b[?7h\x1b[?25h\x1b[?2026l");
+    buf_append_str(&b, "\x1b[?7h\x1b[?25h");
+    if (sync_output) buf_append_str(&b, "\x1b[?2026l");
     write_all(STDOUT_FILENO, b.data, b.len);
 
     buf_free(&b);

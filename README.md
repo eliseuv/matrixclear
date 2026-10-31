@@ -39,6 +39,10 @@ If tmux uses `vim-tmux-navigator`, its default Ctrl+L binding intercepts the
 key before zsh receives it. Set `@vim_navigator_mapping_right` to `C-Right`
 before loading that plugin so the Ctrl+L widget works inside tmux panes.
 
+Inside tmux, frames are sent without synchronized output: tmux would discard
+whole synchronized frames as too large and freeze the pane, so it may show
+partial frames instead.
+
 ## Install with Nix
 
 ```sh
